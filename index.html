@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Planche Scan A4">
+  <title>Planche de Scan A4 - Codes-barres</title>
+
+  <!-- Icône intégrée pour onglet navigateur et raccourci bureau -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234f46e5'/%3E%3Cpath d='M14 16h4v32h-4zm8 0h2v32h-2zm6 0h6v32h-6zm10 0h2v32h-2zm6 0h6v32h-6z' fill='%23ffffff'/%3E%3C/svg%3E">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- JsBarcode pour la génération exacte du Code 39 -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+
+  <!-- jsPDF pour la création directe du document PDF A4 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    .font-code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Style d'impression directe papier A4 */
+    @page {
+      size: A4 portrait;
+      margin: 8mm 6mm;
+    }
+
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+      body {
+        background: #ffffff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      main {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      section {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+      }
+      .barcode-card {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        border: 1px solid #1e293b !important;
+        box-shadow: none !important;
+      }
+    }
+
+    /* Animation de focus lors du scan d'un code */
+    @keyframes scanHighlight {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7); }
+      50% { transform: scale(1.03); box-shadow: 0 0 0 10px rgba(79, 70, 229, 0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+    }
+    .scanned-target {
+      animation: scanHighlight 1.2s ease-in-out;
+      border-color: #4f46e5 !important;
+      background-color: #eef2ff !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+
+  <!-- ==================== BANDEAU DE CONTRÔLE SUPÉRIEUR (NO-PRINT) ==================== -->
+  <header class="no-print bg-slate-900 text-white shadow-xl border-b border-slate-800 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-3 sm:px-6">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        
+        <!-- Titre & Statut -->
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-500 flex items-center justify-center shadow-lg text-white font-bold text-xl">
+            ❚▌
+          </div>
+          <div>
+            <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+              Planche de Scan A4 — Atelier
+              <span class="text-[11px] bg-indigo-500/30 text-indigo-300 font-semibold px-2 py-0.5 rounded-full border border-indigo-400/30">Code 39</span>
+            </h1>
+            <p class="text-xs text-slate-400">Références triées par ordre numérique croissant • Format modèle *REF*</p>
+          </div>
+        </div>
+
+        <!-- Boutons d'action : Téléchargement PDF & Impression -->
+        <div class="flex flex-wrap items-center gap-2">
+          
+          <!-- Télécharger PDF A4 (jsPDF) -->
+          <button id="btnDownloadPdf" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-md transition transform active:scale-95" title="Génère un fichier PDF A4 vectoriel propre">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span>Télécharger PDF A4</span>
+          </button>
+
+          <!-- Impression directe -->
+          <button id="btnPrintDirect" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold shadow-md transition transform active:scale-95" title="Lancer l'impression A4">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            <span>Imprimer A4</span>
+          </button>
+
+          <!-- Réinitialisation liste d'origine -->
+          <button id="btnResetData" class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-2 rounded-xl text-xs font-semibold border border-slate-700 transition" title="Remettre la liste originale des 41 références">
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>Réinitialiser</span>
+          </button>
+
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== PANNEAU DE PILOTAGE : AJOUT, FILTRES, RÉGLAGES ==================== -->
+  <main class="max-w-7xl mx-auto px-4 py-4 sm:px-6 space-y-4">
+
+    <!-- 1. BARRE DE SCAN DIRECT & RECHERCHE RAPIDE -->
+    <section class="no-print bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm border border-slate-200">
+      <div class="flex flex-col sm:flex-row items-center gap-3">
+        <div class="relative w-full">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+            </svg>
+          </div>
+          <input 
+            type="text" 
+            id="searchInput" 
+            placeholder="Scanner une étiquette ou taper une référence (ex: 19240 ou 100557)..." 
+            class="w-full pl-11 pr-24 py-2.5 bg-slate-50 border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 rounded-xl text-sm font-semibold tracking-wide text-slate-800 placeholder-slate-400 transition"
+          >
+          <div class="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-slate-400">
+            <kbd class="px-1.5 py-0.5 bg-slate-200 border border-slate-300 rounded font-mono text-[10px] text-slate-600">Entrée</kbd>
+          </div>
+        </div>
+        <button id="btnClearSearch" class="hidden text-xs text-slate-500 hover:text-slate-800 font-semibold px-2 py-1">
+          Effacer
+        </button>
+      </div>
+    </section>
+
+    <!-- 2. FORMULAIRE D'AJOUT RAPIDE DE RÉFÉRENCE -->
+    <section class="no-print bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm border border-slate-200">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs">+</span>
+          <h2 class="text-xs sm:text-sm font-bold text-slate-900 uppercase tracking-wider">Ajouter une référence</h2>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Champ numéro de base -->
+          <input 
+            type="text" 
+            id="newRefInput" 
+            placeholder="Numéro (ex: 103529)" 
+            class="px-3 py-1.5 bg-slate-50 border border-slate-300 focus:border-indigo-500 rounded-lg text-xs font-semibold w-40"
+          >
+
+          <!-- Sélecteur des suffixes à décliner -->
+          <div class="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs">
+            <span class="text-slate-500 font-medium mr-1 text-[11px]">Déclinaisons :</span>
+            <label class="inline-flex items-center gap-1 cursor-pointer font-medium hover:text-indigo-600">
+              <input type="checkbox" id="addSuffixNone" class="rounded text-indigo-600" checked>
+              <span>Pur</span>
+            </label>
+            <label class="inline-flex items-center gap-1 cursor-pointer font-medium hover:text-indigo-600 ml-1">
+              <input type="checkbox" id="addSuffixFQ" class="rounded text-indigo-600">
+              <span>FQ</span>
+            </label>
+            <label class="inline-flex items-center gap-1 cursor-pointer font-medium hover:text-indigo-600 ml-1">
+              <input type="checkbox" id="addSuffixKQ" class="rounded text-indigo-600">
+              <span>KQ</span>
+            </label>
+            <label class="inline-flex items-center gap-1 cursor-pointer font-medium hover:text-indigo-600 ml-1">
+              <input type="checkbox" id="addSuffixSC" class="rounded text-indigo-600">
+              <span>SC</span>
+            </label>
+            <label class="inline-flex items-center gap-1 cursor-pointer font-medium hover:text-indigo-600 ml-1">
+              <input type="checkbox" id="addSuffixTD" class="rounded text-indigo-600">
+              <span>TD</span>
+            </label>
+          </div>
+
+          <!-- Bouton Ajouter -->
+          <button id="btnAddRef" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold shadow-sm transition">
+            Ajouter à la planche
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. BARRE DE FILTRES MULTI-CRITÈRES & DIMENSIONNEMENT -->
+    <section class="no-print bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm border border-slate-200 space-y-3.5">
+      
+      <!-- LIGNE 1 : FILTRES PAR SUFFIXE -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-500 mr-1">Filtrer par suffixe :</span>
+          
+          <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-indigo-50 text-xs font-bold cursor-pointer text-slate-700 transition">
+            <input type="checkbox" class="suffix-toggle rounded text-indigo-600" value="none" checked>
+            <span>Sans suffixe (pur)</span>
+          </label>
+
+          <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-indigo-50 text-xs font-bold cursor-pointer text-slate-700 transition">
+            <input type="checkbox" class="suffix-toggle rounded text-indigo-600" value="FQ" checked>
+            <span>FQ</span>
+          </label>
+
+          <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-indigo-50 text-xs font-bold cursor-pointer text-slate-700 transition">
+            <input type="checkbox" class="suffix-toggle rounded text-indigo-600" value="KQ" checked>
+            <span>KQ</span>
+          </label>
+
+          <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-indigo-50 text-xs font-bold cursor-pointer text-slate-700 transition">
+            <input type="checkbox" class="suffix-toggle rounded text-indigo-600" value="SC" checked>
+            <span>SC</span>
+          </label>
+
+          <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-indigo-50 text-xs font-bold cursor-pointer text-slate-700 transition">
+            <input type="checkbox" class="suffix-toggle rounded text-indigo-600" value="TD" checked>
+            <span>TD</span>
+          </label>
+        </div>
+
+        <!-- Raccourcis de sélection & Compteur -->
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[11px]">
+            <button id="btnQuickAll" class="px-2 py-0.5 rounded text-indigo-600 hover:bg-white font-semibold">Tout</button>
+            <button id="btnQuickOnlySuffixes" class="px-2 py-0.5 rounded text-indigo-700 hover:bg-white font-bold border-l border-slate-200" title="Affiche seulement FQ, KQ, SC, TD et masque les cylindres sans lettre">Uniquement suffixes</button>
+            <button id="btnQuickOnlyNone" class="px-2 py-0.5 rounded text-indigo-600 hover:bg-white font-semibold border-l border-slate-200">Sans suffixe</button>
+            <button id="btnQuickClear" class="px-2 py-0.5 rounded text-slate-500 hover:bg-white font-semibold border-l border-slate-200">Aucun</button>
+          </div>
+
+          <div class="text-xs font-bold text-slate-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">
+            <span id="countFiltered" class="text-indigo-700 font-extrabold">0</span> / <span id="countTotal">0</span> affichées
+          </div>
+        </div>
+      </div>
+
+      <!-- LIGNE 2 : OPTIONS DE DIMENSIONNEMENT -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
+        
+        <!-- Sélecteur de colonnes -->
+        <div>
+          <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">Colonnes par page</label>
+          <div class="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl">
+            <button type="button" class="col-btn py-1 text-xs font-bold rounded-lg transition text-slate-600 hover:text-slate-900" data-cols="2">2 Col</button>
+            <button type="button" class="col-btn py-1 text-xs font-bold rounded-lg transition bg-white text-indigo-600 shadow-sm" data-cols="3">3 Col</button>
+            <button type="button" class="col-btn py-1 text-xs font-bold rounded-lg transition text-slate-600 hover:text-slate-900" data-cols="4">4 Col</button>
+          </div>
+        </div>
+
+        <!-- Curseur Hauteur des barres -->
+        <div>
+          <div class="flex justify-between items-center text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+            <span>Hauteur barres</span>
+            <span id="valBarcodeHeight" class="text-indigo-600 font-mono">45px</span>
+          </div>
+          <input type="range" id="sliderHeight" min="28" max="70" value="45" class="w-full accent-indigo-600 cursor-pointer">
+        </div>
+
+        <!-- Curseur Épaisseur des barres -->
+        <div>
+          <div class="flex justify-between items-center text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+            <span>Épaisseur barres</span>
+            <span id="valBarcodeWidth" class="text-indigo-600 font-mono">1.3</span>
+          </div>
+          <input type="range" id="sliderWidth" min="1.0" max="2.0" step="0.1" value="1.3" class="w-full accent-indigo-600 cursor-pointer">
+        </div>
+
+        <!-- Curseur Taille de la police -->
+        <div>
+          <div class="flex justify-between items-center text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+            <span>Taille texte référence</span>
+            <span id="valFontSize" class="text-indigo-600 font-mono">16px</span>
+          </div>
+          <input type="range" id="sliderFontSize" min="12" max="22" value="16" class="w-full accent-indigo-600 cursor-pointer">
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ==================== PLANCHE DE CODES-BARRES PRINCIPALE ==================== -->
+    <section class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200">
+      
+      <!-- En-tête d'impression (visible uniquement à l'impression papier) -->
+      <div class="hidden print:flex items-center justify-between border-b-2 border-slate-900 pb-2 mb-4">
+        <div>
+          <h2 class="text-lg font-black tracking-tight text-slate-900 uppercase">Planche de Scan Références & Codes-barres</h2>
+          <p class="text-xs text-slate-600">Standard Code 39 — Tri numérique croissant</p>
+        </div>
+        <div class="text-right text-xs text-slate-500 font-mono" id="printDate"></div>
+      </div>
+
+      <!-- Grille dynamique des cartes de code-barres -->
+      <div id="barcodeGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        <!-- Généré dynamiquement en JavaScript -->
+      </div>
+
+      <!-- Message si aucun résultat -->
+      <div id="noResults" class="hidden text-center py-12">
+        <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3 text-xl">🔍</div>
+        <p class="text-sm font-bold text-slate-700">Aucune référence ne correspond aux filtres actifs.</p>
+        <p class="text-xs text-slate-500 mt-1">Vérifiez vos cases de suffixes ou votre saisie dans la barre de recherche.</p>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- ==================== MODAL DE CONFIRMATION PERSONNALISÉ ==================== -->
+  <div id="customModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-100 transform transition">
+      <h3 id="modalTitle" class="text-base font-bold text-slate-900">Confirmation</h3>
+      <p id="modalMsg" class="text-xs text-slate-600 mt-2 leading-relaxed"></p>
+      <div class="flex justify-end gap-2 mt-5">
+        <button id="modalBtnCancel" class="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">Annuler</button>
+        <button id="modalBtnConfirm" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 transition shadow">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast de notification -->
+  <div id="toast" class="hidden fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl border border-slate-700 flex items-center gap-2 transform transition-all">
+    <span id="toastIcon">ℹ️</span>
+    <span id="toastMsg">Action effectuée</span>
+  </div>
+
+  <!-- ==================== LOGIQUE JAVASCRIPT ==================== -->
+  <script>
+    const INITIAL_REFS = [
+      // Fiche 1 (Cylindres purs)
+      { ref: "18885", baseNum: 18885, suffix: null },
+      { ref: "20414", baseNum: 20414, suffix: null },
+      { ref: "20894", baseNum: 20894, suffix: null },
+      { ref: "100559", baseNum: 100559, suffix: null },
+      { ref: "100971", baseNum: 100971, suffix: null },
+      { ref: "19741", baseNum: 19741, suffix: null },
+      { ref: "25355", baseNum: 25355, suffix: null },
+      { ref: "100411", baseNum: 100411, suffix: null },
+      { ref: "19709", baseNum: 19709, suffix: null },
+      { ref: "100557", baseNum: 100557, suffix: null },
+      { ref: "25353", baseNum: 25353, suffix: null },
+      { ref: "100561", baseNum: 100561, suffix: null },
+      { ref: "100563", baseNum: 100563, suffix: null },
+      { ref: "23665", baseNum: 23665, suffix: null },
+      { ref: "100414", baseNum: 100414, suffix: null },
+
+      // Fiche 2 (En-tête purs)
+      { ref: "100532", baseNum: 100532, suffix: null },
+      { ref: "100537", baseNum: 100537, suffix: null },
+
+      // Fiche 2 (12698 FQ / KQ)
+      { ref: "12698-FQ", baseNum: 12698, suffix: "FQ" },
+      { ref: "12698-KQ", baseNum: 12698, suffix: "KQ" },
+
+      // Fiche 2 (19240 - FQ / KQ / TD / SC)
+      { ref: "19240-FQ", baseNum: 19240, suffix: "FQ" },
+      { ref: "19240-KQ", baseNum: 19240, suffix: "KQ" },
+      { ref: "19240-SC", baseNum: 19240, suffix: "SC" },
+      { ref: "19240-TD", baseNum: 19240, suffix: "TD" },
+
+      // Fiche 2 (19774 FQ / KQ)
+      { ref: "19774-FQ", baseNum: 19774, suffix: "FQ" },
+      { ref: "19774-KQ", baseNum: 19774, suffix: "KQ" },
+
+      // Fiche 2 (21062 - FQ / KQ / SC / TD)
+      { ref: "21062-FQ", baseNum: 21062, suffix: "FQ" },
+      { ref: "21062-KQ", baseNum: 21062, suffix: "KQ" },
+      { ref: "21062-SC", baseNum: 21062, suffix: "SC" },
+      { ref: "21062-TD", baseNum: 21062, suffix: "TD" },
+
+      // Fiche 2 (25616 - TD / KQ / FQ / SC)
+      { ref: "25616-FQ", baseNum: 25616, suffix: "FQ" },
+      { ref: "25616-KQ", baseNum: 25616, suffix: "KQ" },
+      { ref: "25616-SC", baseNum: 25616, suffix: "SC" },
+      { ref: "25616-TD", baseNum: 25616, suffix: "TD" },
+
+      // Fiche 2 (106588 - FQ / KQ / SC / TD)
+      { ref: "106588-FQ", baseNum: 106588, suffix: "FQ" },
+      { ref: "106588-KQ", baseNum: 106588, suffix: "KQ" },
+      { ref: "106588-SC", baseNum: 106588, suffix: "SC" },
+      { ref: "106588-TD", baseNum: 106588, suffix: "TD" },
+
+      // Fiche 2 (106602 - FQ / KQ / SC / TD)
+      { ref: "106602-FQ", baseNum: 106602, suffix: "FQ" },
+      { ref: "106602-KQ", baseNum: 106602, suffix: "KQ" },
+      { ref: "106602-SC", baseNum: 106602, suffix: "SC" },
+      { ref: "106602-TD", baseNum: 106602, suffix: "TD" }
+    ];
+
+    let referencesList = [];
+    try {
+      const saved = localStorage.getItem('scan_sheet_refs_clean_v4');
+      if (saved) {
+        referencesList = JSON.parse(saved);
+      } else {
+        referencesList = [...INITIAL_REFS];
+      }
+    } catch (e) {
+      referencesList = [...INITIAL_REFS];
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem('scan_sheet_refs_clean_v4', JSON.stringify(referencesList));
+      } catch (e) {}
+    }
+
+    let currentCols = 3;
+    let currentBarcodeHeight = 45;
+    let currentBarcodeWidth = 1.3;
+    let currentFontSize = 16;
+    let searchQuery = '';
+    let activeSuffixes = new Set(['none', 'FQ', 'KQ', 'SC', 'TD']);
+
+    const barcodeGrid = document.getElementById('barcodeGrid');
+    const noResults = document.getElementById('noResults');
+    const countFiltered = document.getElementById('countFiltered');
+    const countTotal = document.getElementById('countTotal');
+    const searchInput = document.getElementById('searchInput');
+    const btnClearSearch = document.getElementById('btnClearSearch');
+    const sliderHeight = document.getElementById('sliderHeight');
+    const sliderWidth = document.getElementById('sliderWidth');
+    const sliderFontSize = document.getElementById('sliderFontSize');
+    const valBarcodeHeight = document.getElementById('valBarcodeHeight');
+    const valBarcodeWidth = document.getElementById('valBarcodeWidth');
+    const valFontSize = document.getElementById('valFontSize');
+    const printDate = document.getElementById('printDate');
+
+    if (printDate) {
+      printDate.textContent = new Date().toLocaleDateString('fr-FR', {
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    function playScanBeep() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.12);
+      } catch (e) {}
+    }
+
+    function showToast(msg, icon = '✓') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+      if (!toast || !toastMsg) return;
+      toastMsg.innerHTML = msg;
+      if (toastIcon) toastIcon.textContent = icon;
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 2500);
+    }
+
+    function openModal(title, msg, onConfirm) {
+      const modal = document.getElementById('customModal');
+      const modalTitle = document.getElementById('modalTitle');
+      const modalMsg = document.getElementById('modalMsg');
+      const btnCancel = document.getElementById('modalBtnCancel');
+      const btnConfirm = document.getElementById('modalBtnConfirm');
+
+      if (!modal) return;
+      modalTitle.textContent = title;
+      modalMsg.textContent = msg;
+
+      modal.classList.remove('hidden');
+
+      const cleanup = () => {
+        modal.classList.add('hidden');
+        btnCancel.onclick = null;
+        btnConfirm.onclick = null;
+      };
+
+      btnCancel.onclick = cleanup;
+      btnConfirm.onclick = () => {
+        cleanup();
+        onConfirm();
+      };
+    }
+
+    function sortList(arr) {
+      return [...arr].sort((a, b) => {
+        if (a.baseNum !== b.baseNum) {
+          return a.baseNum - b.baseNum;
+        }
+        const sA = a.suffix || '';
+        const sB = b.suffix || '';
+        return sA.localeCompare(sB);
+      });
+    }
+
+    function getFilteredList() {
+      const sorted = sortList(referencesList);
+      return sorted.filter(item => {
+        const cat = item.suffix ? item.suffix : 'none';
+        if (!activeSuffixes.has(cat)) return false;
+
+        if (searchQuery.trim() !== '') {
+          const q = searchQuery.toLowerCase().trim();
+          return item.ref.toLowerCase().includes(q);
+        }
+        return true;
+      });
+    }
+
+    function render() {
+      const filtered = getFilteredList();
+
+      if (countFiltered) countFiltered.textContent = filtered.length;
+      if (countTotal) countTotal.textContent = referencesList.length;
+
+      barcodeGrid.className = `grid gap-3 ${
+        currentCols === 2 ? 'grid-cols-1 sm:grid-cols-2' :
+        currentCols === 4 ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-4' :
+        'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'
+      }`;
+
+      if (filtered.length === 0) {
+        barcodeGrid.innerHTML = '';
+        noResults.classList.remove('hidden');
+        return;
+      }
+      noResults.classList.add('hidden');
+
+      barcodeGrid.innerHTML = '';
+
+      filtered.forEach((item, index) => {
+        const card = document.createElement('div');
+        card.id = `card-${item.ref.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        card.className = "barcode-card group relative bg-white border border-slate-300 hover:border-indigo-500 rounded-xl p-3 flex flex-col justify-between shadow-sm hover:shadow-md transition";
+
+        let badgeHtml = '';
+        if (item.suffix) {
+          badgeHtml = `<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">${item.suffix}</span>`;
+        } else {
+          badgeHtml = `<span class="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-50 text-slate-500 border border-slate-200">Pur</span>`;
+        }
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between border-b border-slate-100 pb-1 mb-1">
+            <span class="font-black text-slate-900 tracking-tight font-code truncate" style="font-size: ${currentFontSize}px;">
+              ${item.ref}
+            </span>
+            <div class="flex items-center gap-1.5 shrink-0">
+              ${badgeHtml}
+              <button onclick="promptDelete('${item.ref}')" title="Supprimer" class="no-print opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 p-0.5 transition rounded">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="w-full flex items-center justify-center py-1 overflow-hidden">
+            <svg id="svg-${index}" class="w-full block"></svg>
+          </div>
+
+          <div class="text-center font-code font-bold text-slate-700 tracking-wider text-xs pt-1 border-t border-slate-100">
+            *${item.ref}*
+          </div>
+        `;
+
+        barcodeGrid.appendChild(card);
+
+        try {
+          JsBarcode(`#svg-${index}`, item.ref, {
+            format: "CODE39",
+            displayValue: false,
+            lineColor: "#000000",
+            background: "transparent",
+            margin: 0,
+            height: currentBarcodeHeight,
+            width: currentBarcodeWidth
+          });
+        } catch (err) {
+          console.warn("Erreur JsBarcode pour", item.ref, err);
+        }
+      });
+    }
+
+    window.promptDelete = function(refToDelete) {
+      openModal(
+        "Supprimer la référence ?",
+        `Confirmez-vous la suppression de ${refToDelete} de la planche ?`,
+        () => {
+          referencesList = referencesList.filter(r => r.ref !== refToDelete);
+          saveState();
+          render();
+          showToast(`Référence <strong>${refToDelete}</strong> supprimée.`);
+        }
+      );
+    };
+
+    function updateActiveSuffixes() {
+      activeSuffixes.clear();
+      document.querySelectorAll('.suffix-toggle:checked').forEach(cb => {
+        activeSuffixes.add(cb.value);
+      });
+      render();
+    }
+
+    document.querySelectorAll('.suffix-toggle').forEach(cb => {
+      cb.addEventListener('change', updateActiveSuffixes);
+    });
+
+    document.getElementById('btnQuickAll')?.addEventListener('click', () => {
+      document.querySelectorAll('.suffix-toggle').forEach(cb => cb.checked = true);
+      updateActiveSuffixes();
+    });
+
+    document.getElementById('btnQuickClear')?.addEventListener('click', () => {
+      document.querySelectorAll('.suffix-toggle').forEach(cb => cb.checked = false);
+      updateActiveSuffixes();
+    });
+
+    document.getElementById('btnQuickOnlyNone')?.addEventListener('click', () => {
+      document.querySelectorAll('.suffix-toggle').forEach(cb => cb.checked = (cb.value === 'none'));
+      updateActiveSuffixes();
+    });
+
+    document.getElementById('btnQuickOnlySuffixes')?.addEventListener('click', () => {
+      document.querySelectorAll('.suffix-toggle').forEach(cb => cb.checked = (cb.value !== 'none'));
+      updateActiveSuffixes();
+    });
+
+    document.querySelectorAll('.col-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.col-btn').forEach(b => {
+          b.classList.remove('bg-white', 'text-indigo-600', 'shadow-sm');
+          b.classList.add('text-slate-600');
+        });
+        btn.classList.add('bg-white', 'text-indigo-600', 'shadow-sm');
+        btn.classList.remove('text-slate-600');
+        currentCols = parseInt(btn.dataset.cols, 10);
+        render();
+      });
+    });
+
+    sliderHeight?.addEventListener('input', (e) => {
+      currentBarcodeHeight = parseInt(e.target.value, 10);
+      if (valBarcodeHeight) valBarcodeHeight.textContent = `${currentBarcodeHeight}px`;
+      render();
+    });
+
+    sliderWidth?.addEventListener('input', (e) => {
+      currentBarcodeWidth = parseFloat(e.target.value);
+      if (valBarcodeWidth) valBarcodeWidth.textContent = currentBarcodeWidth.toFixed(1);
+      render();
+    });
+
+    sliderFontSize?.addEventListener('input', (e) => {
+      currentFontSize = parseInt(e.target.value, 10);
+      if (valFontSize) valFontSize.textContent = `${currentFontSize}px`;
+      render();
+    });
+
+    searchInput?.addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      btnClearSearch?.classList.toggle('hidden', !searchQuery);
+      render();
+    });
+
+    searchInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const raw = searchInput.value.trim().toUpperCase().replace(/^\*+|\*+$/g, '');
+        const match = referencesList.find(r => r.ref.toUpperCase() === raw);
+
+        if (match) {
+          playScanBeep();
+          const cat = match.suffix ? match.suffix : 'none';
+          if (!activeSuffixes.has(cat)) {
+            activeSuffixes.add(cat);
+            const cb = document.querySelector(`.suffix-toggle[value="${cat}"]`);
+            if (cb) cb.checked = true;
+          }
+          searchQuery = '';
+          searchInput.value = '';
+          btnClearSearch?.classList.add('hidden');
+          render();
+
+          const targetCard = document.getElementById(`card-${match.ref.replace(/[^a-zA-Z0-9]/g, '_')}`);
+          if (targetCard) {
+            targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetCard.classList.add('scanned-target');
+            setTimeout(() => targetCard.classList.remove('scanned-target'), 2000);
+          }
+          showToast(`Référence <strong>${match.ref}</strong> détectée et localisée !`, '🎯');
+        } else {
+          showToast(`Référence <strong>${raw}</strong> non trouvée`, '⚠️');
+        }
+      }
+    });
+
+    btnClearSearch?.addEventListener('click', () => {
+      searchQuery = '';
+      if (searchInput) searchInput.value = '';
+      btnClearSearch.classList.add('hidden');
+      render();
+    });
+
+    function handleAdd() {
+      const input = document.getElementById('newRefInput');
+      if (!input) return;
+      const raw = input.value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      if (!raw) {
+        showToast("Veuillez saisir un numéro de référence", "⚠️");
+        return;
+      }
+
+      const baseClean = raw.split('-')[0];
+      const baseNum = parseInt(baseClean.replace(/\D/g, ''), 10) || 0;
+
+      const chkNone = document.getElementById('addSuffixNone')?.checked;
+      const chkFQ = document.getElementById('addSuffixFQ')?.checked;
+      const chkKQ = document.getElementById('addSuffixKQ')?.checked;
+      const chkSC = document.getElementById('addSuffixSC')?.checked;
+      const chkTD = document.getElementById('addSuffixTD')?.checked;
+
+      const suffixesToAdd = [];
+      if (chkNone) suffixesToAdd.push(null);
+      if (chkFQ) suffixesToAdd.push('FQ');
+      if (chkKQ) suffixesToAdd.push('KQ');
+      if (chkSC) suffixesToAdd.push('SC');
+      if (chkTD) suffixesToAdd.push('TD');
+
+      if (suffixesToAdd.length === 0) {
+        suffixesToAdd.push(null);
+      }
+
+      let addedCount = 0;
+      suffixesToAdd.forEach(suf => {
+        const fullRef = suf ? `${baseClean}-${suf}` : baseClean;
+        if (!referencesList.some(r => r.ref === fullRef)) {
+          referencesList.push({ ref: fullRef, baseNum: baseNum, suffix: suf });
+          addedCount++;
+        }
+      });
+
+      if (addedCount > 0) {
+        saveState();
+        input.value = '';
+        render();
+        showToast(`<strong>${addedCount}</strong> référence(s) ajoutée(s) et ordonnée(s) !`);
+      } else {
+        showToast("Cette référence existe déjà dans la liste", "ℹ️");
+      }
+    }
+
+    document.getElementById('btnAddRef')?.addEventListener('click', handleAdd);
+    document.getElementById('newRefInput')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleAdd();
+      }
+    });
+
+    document.getElementById('btnResetData')?.addEventListener('click', () => {
+      openModal(
+        "Réinitialiser la liste ?",
+        "Voulez-vous recharger la liste originale de 41 références issues des notes manuscrites ?",
+        () => {
+          referencesList = [...INITIAL_REFS];
+          saveState();
+          render();
+          showToast("Liste réinitialisée aux 41 références.");
+        }
+      );
+    });
+
+    // ==================== GÉNÉRATION DU PDF A4 ====================
+    document.getElementById('btnDownloadPdf')?.addEventListener('click', async () => {
+      const filtered = getFilteredList();
+      if (filtered.length === 0) {
+        showToast("Aucune référence à exporter", "⚠️");
+        return;
+      }
+
+      showToast("Génération du PDF A4 en cours...", "⏳");
+
+      const { jsPDF } = window.jspdf || {};
+      if (!jsPDF) {
+        showToast("Erreur : bibliothèque PDF indisponible", "❌");
+        return;
+      }
+
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const marginX = 8;
+      const marginTop = 16;
+      const marginBottom = 12;
+
+      const cols = currentCols;
+      const gapX = 4;
+      const gapY = 4;
+
+      const colWidth = (pageWidth - (2 * marginX) - ((cols - 1) * gapX)) / cols;
+
+      let rowsPerPage = 6;
+      if (cols === 2) rowsPerPage = 7;
+      if (cols === 4) rowsPerPage = 7;
+
+      const availableHeight = pageHeight - marginTop - marginBottom;
+      const cardHeight = (availableHeight - ((rowsPerPage - 1) * gapY)) / rowsPerPage;
+      const itemsPerPage = cols * rowsPerPage;
+      const totalPages = Math.ceil(filtered.length / itemsPerPage);
+
+      const tempCanvas = document.createElement('canvas');
+
+      for (let i = 0; i < filtered.length; i++) {
+        const pageNum = Math.floor(i / itemsPerPage);
+        const pageIndex = i % itemsPerPage;
+
+        if (i > 0 && pageIndex === 0) {
+          doc.addPage();
+        }
+
+        if (pageIndex === 0) {
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9);
+          doc.setTextColor(30, 41, 59);
+          doc.text("Planche de Scan Références & Codes-barres (Code 39)", marginX, 8);
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8);
+          doc.setTextColor(100, 116, 139);
+          doc.text(`Page ${pageNum + 1} / ${totalPages} — ${filtered.length} réf. actives`, pageWidth - marginX, 8, { align: 'right' });
+          doc.setDrawColor(203, 213, 225);
+          doc.setLineWidth(0.3);
+          doc.line(marginX, 10, pageWidth - marginX, 10);
+        }
+
+        const row = Math.floor(pageIndex / cols);
+        const col = pageIndex % cols;
+
+        const x = marginX + col * (colWidth + gapX);
+        const y = marginTop + row * (cardHeight + gapY);
+
+        doc.setDrawColor(30, 41, 59);
+        doc.setLineWidth(0.25);
+        doc.roundedRect(x, y, colWidth, cardHeight, 1.2, 1.2, 'S');
+
+        const item = filtered[i];
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(Math.min(13, Math.max(9, currentFontSize * 0.68)));
+        doc.setTextColor(15, 23, 42);
+        doc.text(item.ref, x + 3, y + 4.8);
+
+        if (item.suffix) {
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(7.5);
+          doc.setTextColor(67, 56, 202);
+          doc.text(item.suffix, x + colWidth - 3, y + 4.8, { align: 'right' });
+        }
+
+        try {
+          JsBarcode(tempCanvas, item.ref, {
+            format: "CODE39",
+            displayValue: false,
+            lineColor: "#000000",
+            background: "#ffffff",
+            margin: 0,
+            width: 2,
+            height: 40
+          });
+
+          const imgData = tempCanvas.toDataURL("image/png");
+
+          const pdfBarcodeHeight = Math.min(13, Math.max(9, currentBarcodeHeight * 0.22));
+          const pdfBarcodeWidth = colWidth - 8;
+          const barcodeY = y + 6.5;
+
+          doc.addImage(imgData, 'PNG', x + 4, barcodeY, pdfBarcodeWidth, pdfBarcodeHeight);
+
+          doc.setFont("courier", "bold");
+          doc.setFontSize(8);
+          doc.setTextColor(30, 41, 59);
+          doc.text(`*${item.ref}*`, x + (colWidth / 2), barcodeY + pdfBarcodeHeight + 3.8, { align: 'center' });
+        } catch (e) {
+          console.warn(e);
+        }
+      }
+
+      doc.save(`Planche_Codes_Barres_A4_${new Date().toISOString().slice(0,10)}.pdf`);
+      showToast("PDF A4 prêt et téléchargé !", "📥");
+    });
+
+    // ==================== IMPRESSION DIRECTE ====================
+    document.getElementById('btnPrintDirect')?.addEventListener('click', () => {
+      const filtered = getFilteredList();
+      if (filtered.length === 0) {
+        showToast("Aucune référence à imprimer", "⚠️");
+        return;
+      }
+
+      // Sur GitHub Pages ou en local (hors iframe), window.print() fonctionne nativement
+      if (window.self === window.top) {
+        window.print();
+        return;
+      }
+
+      // Fallback si ouvert dans un cadre de prévisualisation (iframe)
+      const printHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Planche A4 - Impression Directe</title>
+          <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
+          <style>
+            @page { size: A4 portrait; margin: 8mm 6mm; }
+            body { font-family: sans-serif; margin: 0; padding: 0; color: #000; }
+            .grid { display: grid; grid-template-columns: repeat(${currentCols}, 1fr); gap: 10px; }
+            .card { border: 1.5px solid #222; border-radius: 6px; padding: 6px; text-align: center; break-inside: avoid; page-break-inside: avoid; }
+            .ref { font-weight: 900; font-size: ${currentFontSize}px; text-align: left; margin-bottom: 2px; }
+            .human { font-family: monospace; font-size: 11px; font-weight: bold; margin-top: 2px; }
+            svg { width: 100%; max-height: ${currentBarcodeHeight}px; }
+          </style>
+        </head>
+        <body>
+          <div class="grid">
+            ${filtered.map((item, idx) => `
+              <div class="card">
+                <div class="ref">${item.ref}</div>
+                <svg id="pbc-${idx}"></svg>
+                <div class="human">*${item.ref}*</div>
+              </div>
+            `).join('')}
+          </div>
+          <script>
+            const refs = ${JSON.stringify(filtered.map(f => f.ref))};
+            refs.forEach((ref, idx) => {
+              try {
+                JsBarcode('#pbc-' + idx, ref, {
+                  format: "CODE39",
+                  displayValue: false,
+                  lineColor: "#000",
+                  margin: 0,
+                  height: ${currentBarcodeHeight},
+                  width: ${currentBarcodeWidth}
+                });
+              } catch(e){}
+            });
+            window.onload = () => { setTimeout(() => window.print(), 350); };
+          <\/script>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob([printHtml], { type: 'text/html' });
+      const blobUrl = URL.createObjectURL(blob);
+      const printWindow = window.open(blobUrl, '_blank');
+      if (!printWindow) {
+        showToast("Veuillez autoriser les popups pour l'impression directe", "⚠️");
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>
